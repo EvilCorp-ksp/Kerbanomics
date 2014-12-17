@@ -97,10 +97,10 @@ namespace Kerbanomics
                             message.AppendLine(", level" + crewMember.experienceLevel + ", is available. Wages paid = " + paycheck);
                             Funding.Instance.AddFunds(-paycheck, 0);
                         }
-                        double externalFunding = 2500 + 247.5 * Reputation.CurrentRep;
-                        Funding.Instance.AddFunds(+externalFunding, 0);
-                        message.AppendLine("Received Funding - " + externalFunding);
                     }
+                    double externalFunding = 2500 + 247.5 * Reputation.CurrentRep;
+                    Funding.Instance.AddFunds(+externalFunding, 0);
+                    message.AppendLine("Received Funding - " + externalFunding);
                     MessageSystem.Message m = new MessageSystem.Message(
                         "Processing Finances",
                         message.ToString(),
