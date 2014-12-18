@@ -14,22 +14,20 @@ namespace Kerbanomics
         double _interval;
         public static int _lastUpdate = 0;
         Game game;
-        public static ApplicationLauncherButton button;
+        public ApplicationLauncherButton button;
 
         public static Kerbanomics Instance;
 
         public void Awake()
         {
             game = HighLogic.CurrentGame;
-
-            GameEvents.onGUIApplicationLauncherReady.Add(onGUIApplicationLauncherReady);
-
             if (GameSettings.KERBIN_TIME)
                 _interval = 2300400;
             else
                 _interval = 7884000;
             if (HighLogic.LoadedSceneHasPlanetarium)
                 _lastUpdate = (int)Math.Floor(Planetarium.GetUniversalTime() / _interval);
+
         }
 
         public void Start()
@@ -39,6 +37,13 @@ namespace Kerbanomics
                 Destroy(Instance);
             }
             Instance = this;
+            GameEvents.onGUIApplicationLauncherReady.Add(OnGUIAppLauncherReady);
+        }
+
+        public void DestroyButtons()
+        {
+            GameEvents.onGUIApplicationLauncherReady.Remove(OnGUIAppLauncherReady);
+            ApplicationLauncher.Instance.RemoveModApplication(button);
         }
 
         void Update()
@@ -110,50 +115,58 @@ namespace Kerbanomics
                 }
             }
         }
-               
-        void onGUIApplicationLauncherReady()
+
+        public void OnDestroy()
         {
-            if (button == null)
-                button = ApplicationLauncher.Instance.AddModApplication(
-                    onAppLauncherToggleOn,
-                    onAppLauncherToggleOf,
-                    onAppLauncherHover,
-                    onAppLauncherHoverOut,
-                    onAppLauncherEnable,
-                    onAppLauncherDisable,
-                    ApplicationLauncher.AppScenes.SPACECENTER,
-                    (Texture)GameDatabase.Instance.GetTexture("Kerbanomics/Textures/icon_button_stock", false));
+            DestroyButtons();
         }
+        void OnGUIAppLauncherReady()
+        {
+            this.button = ApplicationLauncher.Instance.AddModApplication(
+                onAppLauncherToggleOn,
+                onAppLauncherToggleOff,
+                null,
+                null,
+                null,
+                null,
+                ApplicationLauncher.AppScenes.SPACECENTER,
+                (Texture)GameDatabase.Instance.GetTexture("EvilCorp/Textures/icon_button_stock", false));
+        }
+               
+        //void onGUIApplicationLauncherReady()
+        //{
+            
+        //}
 
         void onAppLauncherToggleOn()
         {
-            print("Toggled on");
+            Debug.Log("Toggled on");
         }
 
-        void onAppLauncherToggleOf()
+        void onAppLauncherToggleOff()
         {
-            print("Toggled off");
+            Debug.Log("Toggled off");
         }
 
-        void onAppLauncherHover()
-        {
+        //void onAppLauncherHover()
+        //{
 
-        }
+        //}
 
-        void onAppLauncherHoverOut()
-        {
+        //void onAppLauncherHoverOut()
+        //{
 
-        }
+        //}
 
 
-        void onAppLauncherEnable()
-        {
+        //void onAppLauncherEnable()
+        //{
 
-        }
+        //}
 
-        void onAppLauncherDisable()
-        {
+        //void onAppLauncherDisable()
+        //{
 
-        }
+        //}
     }
 }
