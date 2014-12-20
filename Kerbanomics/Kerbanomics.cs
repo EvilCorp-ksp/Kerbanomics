@@ -335,6 +335,24 @@ namespace Kerbanomics
                 Debug.Log("Financed: " + amountFinanced);
                 Debug.Log("Estimated Payment: " + estPayment);
                 Debug.Log("Interest: " + intMult);
+                
+                \\Here is a set of calculations using compound interest instead of the above calcs
+                float APR = CalcInterest();
+                \\50% annual rates are HUGE.  A more sensible range of rates might be 3-20%, for now let's use the existing code
+                \\there are 4 periods per year, so the period percentage is:
+                float periodRate = 100*((1+APR/100)^(1.0/4)-1); \\gives the rate in %
+                \\the next calculation gives the payment value including the interest accrued over the life of the loan
+                float paymentValue = (1.0/(periodRate/100))*(1 - 1.0/(1+periodRate/100)^(payments));
+                
+                \\the estimated payment is the loan principle (required amount) divided by the payment value
+                estPayment = reqAmount / paymentValue;
+                
+                \\the total loan to be repayed is given by the estimated payment times the number of periods for the life of the loan
+                amountFinanced = estPayment*payments; 
+                Debug.Log("Compound Financed: " + amountFinanced);
+                Debug.Log("Estimated Payment: " + estPayment);
+                Debug.Log("Annual Interest Rate (APR): " + APR);
+                Debug.Log("paymentValue: " + paymentValue);
             }
             if (amountFinanced != 0)
             {
