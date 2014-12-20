@@ -248,7 +248,7 @@ namespace Kerbanomics
             billing_enabled = GUILayout.Toggle(billing_enabled, "Enabled");
             GUILayout.FlexibleSpace();
             //yearly = GUILayout.Toggle(yearly, "Yearly Billing");
-            //GUILayout.EndHorizontal();
+            GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
             GUILayout.Label("Maximum % of funds paid per period: ");
             GUILayout.FlexibleSpace();
