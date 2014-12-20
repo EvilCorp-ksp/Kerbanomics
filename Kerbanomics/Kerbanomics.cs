@@ -22,7 +22,7 @@ namespace Kerbanomics
         private int level3 = 80;
         private int level4 = 140;
         private int level5 = 200;
-        private int standbyPct = 50;
+        private float standbyPct = 50;
         private bool yearly = false;
 
         private double bills = 0;
@@ -88,9 +88,9 @@ namespace Kerbanomics
                 int currentPeriod = (int)Math.Floor(Planetarium.GetUniversalTime() / _interval);
                 if (currentPeriod > _lastUpdate && billing_enabled == true)
                 {
-                    double multiplier = 106.5;
+                    float multiplier = 106.5f;
                     if (yearly == true)
-                        multiplier = 426.08;
+                        multiplier = 426.08f;
                     Debug.Log("_lastUpdate=" + _lastUpdate + ", currentDay=" + currentPeriod);
                     _lastUpdate = (currentPeriod);
                     StringBuilder message = new StringBuilder();
@@ -98,8 +98,8 @@ namespace Kerbanomics
                     message.AppendLine("Current staff:");
                     foreach (ProtoCrewMember crewMember in game.CrewRoster.Crew)
                     {
-                        double wage = 10;
-                        double standbyWage = 5;
+                        float wage = 10;
+                        float standbyWage = 5;
                         switch (crewMember.experienceLevel)
                         {
                             case 0:
@@ -126,24 +126,25 @@ namespace Kerbanomics
                         }
                         standbyWage = standbyPct / 100 * wage;
                         message.Append(crewMember.name);
+                        float paycheck = 0;
                         if (crewMember.rosterStatus.Equals(ProtoCrewMember.RosterStatus.Assigned))
                         {
-                            double paycheck = wage * multiplier;
+                            paycheck = wage * multiplier;
                             message.AppendLine(", level" + crewMember.experienceLevel + ", is on mission. Wages paid = " + paycheck);
                             Funding.Instance.AddFunds(-paycheck, 0);
                         }
                         else if (crewMember.rosterStatus.Equals(ProtoCrewMember.RosterStatus.Available))
                         {
-                            double paycheck = standbyWage * multiplier;
+                            paycheck = standbyWage * multiplier;
                             message.AppendLine(", level" + crewMember.experienceLevel + ", is available. Wages paid = " + paycheck);
                             Funding.Instance.AddFunds(-paycheck, 0);
                         }
                     }
                     Funding.Instance.AddFunds(-PayLoan(loanPayment), 0);
                     message.AppendLine("Thank you for your loan payment in the amount of " + loanPayment + "! Have a pleasant day!");
-                    double externalFunding = 2500 * Reputation.CurrentRep;
+                    float externalFunding = 2500 + (247.5f * Reputation.CurrentRep);
                     if (yearly == true)
-                        externalFunding = 10000 * Reputation.CurrentRep;
+                        externalFunding = 10000 + (990 * Reputation.CurrentRep);
                     Funding.Instance.AddFunds(+externalFunding, 0);
                     message.AppendLine("Received Funding - " + externalFunding);
                     SaveData();
@@ -246,8 +247,8 @@ namespace Kerbanomics
             GUILayout.BeginHorizontal();
             billing_enabled = GUILayout.Toggle(billing_enabled, "Enabled");
             GUILayout.FlexibleSpace();
-            yearly = GUILayout.Toggle(yearly, "Yearly Billing");
-            GUILayout.EndHorizontal();
+            //yearly = GUILayout.Toggle(yearly, "Yearly Billing");
+            //GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
             GUILayout.Label("Maximum % of funds paid per period: ");
             GUILayout.FlexibleSpace();
