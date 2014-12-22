@@ -335,6 +335,36 @@ namespace Kerbanomics
                 Debug.Log("Financed: " + amountFinanced);
                 Debug.Log("Estimated Payment: " + estPayment);
                 Debug.Log("Interest: " + intMult);
+                
+                //Here is a set of calculations using compound interest instead of the above calcs
+                float APR = CalcInterest();
+                //50% annual rates are HUGE.  A more sensible range of rates might be 3-20%, for now let's use the existing code
+                //there are 4 periods per year, so the period percentage is:
+                float periodRate = 100*(Math.Pow((1+APR/100),(1.0/4))-1); //gives the rate in %
+                //the next calculation gives the payment value including the interest accrued over the life of the loan
+                float paymentValue = (1.0/(periodRate/100))*(1 - 1.0/(Math.Pow((1+periodRate/100),payments)));
+                
+                //the estimated payment is the loan principle (required amount) divided by the payment value
+                estPayment = reqAmount / paymentValue;
+                
+                //the total loan to be repayed is given by the estimated payment times the number of periods for the life of the loan
+                amountFinanced = estPayment*payments; 
+                Debug.Log("Compound Financed: " + amountFinanced);
+                Debug.Log("Estimated Payment: " + estPayment);
+                Debug.Log("Annual Interest Rate (APR): " + APR);
+                Debug.Log("paymentValue: " + paymentValue);
+                /*what should really be done is to keep track of the per period interest rate and the following steps
+                would look like a real loan:
+                At the loan disbursement, apply the value of the loan, only, as the financed amount.
+                Each update period the following would be calculated: interest amount based on the periodRate calculated above.
+                The interest rate is added to the financed amount for this period.
+                Then, the player would be asked if they authorize the standard payment for the period (i.e. the estPayment).
+                IF the player only payed the estPayment each period, the loan would eventually be payed back
+                (including the compound interest).  An option should probably be included for the player to provide a larger payment 
+                than the estPayment to pay down more of the loan principle.
+                A simple check making the max payment no larger than the remaining principle*(1+periodRate) would eliminate overpaying
+                the loan.
+                */
             }
             if (amountFinanced != 0)
             {
