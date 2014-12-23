@@ -26,7 +26,7 @@ namespace Kerbanomics
         private bool yearly = false;
         
         private double bills = 0;
-        private float loanAmount = 0;
+        private double loanAmount = 0;
         private float loanPayment = 0;
         int addPay = 0;
         int reqAmount = 0;
@@ -39,16 +39,14 @@ namespace Kerbanomics
 
         double _interval = 2300400;
         public static int _lastUpdate = 0;
-        Game game;
-        private Rect settingsWindow = new Rect(Screen.height / 8 + 125, Screen.width / 4 , 300, 400);
-        private Rect mainWindow = new Rect(Screen.width / 8 + 125, Screen.height / 4, 400, 125); 
-        private Rect loanWindow = new Rect(Screen.width / 8 + 325, Screen.height / 4 , 400, 125);
+        private Rect settingsWindow = new Rect(Screen.height / 8 + 500, Screen.width / 4 , 300, 400);
+        private Rect mainWindow = new Rect(Screen.width / 8 + 100, Screen.height / 4, 400, 125); 
+        private Rect loanWindow = new Rect(Screen.width / 8 + 500, Screen.height / 4 , 400, 125);
         public ApplicationLauncherButton button;
         public static Kerbanomics Instance;
 
         public void Awake()
         {
-            game = HighLogic.CurrentGame;
             LoadSettings();
         }
 
@@ -90,18 +88,18 @@ namespace Kerbanomics
                     StringBuilder message = new StringBuilder();
                     message.AppendLine("Payroll is processed.");
                     message.AppendLine("Current staff:");
-                    foreach (ProtoCrewMember crewMember in game.CrewRoster.Crew)
+                    foreach (ProtoCrewMember crewMember in HighLogic.CurrentGame.CrewRoster.Crew)
                     {
-                        string crewMemberInfo = crewMember.name + " " + crewMember.rosterStatus.ToString() + crewMember.experienceLevel;
+                        //string crewMemberInfo = crewMember.name + " " + crewMember.rosterStatus.ToString() + crewMember.experienceLevel;
                         message.Append(crewMember.name);
                         if (!crewMember.rosterStatus.Equals(ProtoCrewMember.RosterStatus.Dead) && !crewMember.rosterStatus.Equals(ProtoCrewMember.RosterStatus.Missing))
                         {
-                            float paycheck = GetWages(crewMember.experienceLevel) * multiplier;
+                            float paycheck = GetWages(crewMember.experienceLevel, crewMember.rosterStatus.ToString()) * multiplier;
                             message.AppendLine(", level " + crewMember.experienceLevel + ", is " + crewMember.rosterStatus + ". Wages paid = " + paycheck);
                             //Debug.Log(crewMemberInfo);
                             //Debug.Log("Roster Status: " + crewMember.rosterStatus.ToString());
                             Debug.Log("Multiplier: " + multiplier);
-                            Debug.Log("Wages: " + GetWages(crewMember.experienceLevel));
+                            Debug.Log("Wages: " + GetWages(crewMember.experienceLevel, crewMember.rosterStatus.ToString()));
                             Funding.Instance.AddFunds(-paycheck, 0);
                         }
                     }
@@ -147,9 +145,8 @@ namespace Kerbanomics
             _lastUpdate = (int)Math.Floor(Planetarium.GetUniversalTime() / GetInterval());
         }
 
-        public float GetWages(int level)
+        public float GetWages(int level, string status)
         {
-            //standbyPct = standbyPct / 100;
             float w = level0;
             switch (level)
             {
@@ -175,10 +172,11 @@ namespace Kerbanomics
                     w = 10;
                     break;
             }
-            //if (status == "Available")
-            //{
-            //    w = w / 2;
-            //}
+            if (status == "Available")
+            {
+                float pBuf = w / 100;
+                w = pBuf * standbyPct;
+            }
             return w;
         }
 
@@ -248,7 +246,7 @@ namespace Kerbanomics
             GUILayout.Label("Outstanding Bills: " + bills.ToString());
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
-            GUILayout.Label("Loan Balance: " + loanAmount.ToString());
+            GUILayout.Label("Loan Balance: " + Double.Parse(loanAmount.ToString()));
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
             GUILayout.Label("Scheduled Loan Payment: " + loanPayment.ToString());
@@ -356,7 +354,7 @@ namespace Kerbanomics
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
-            GUILayout.Label("Total amount financed: " + amountFinanced);
+            GUILayout.Label("Total amount financed: " + Double.Parse(amountFinanced.ToString()));
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
@@ -369,36 +367,6 @@ namespace Kerbanomics
                 Debug.Log("Financed: " + amountFinanced);
                 Debug.Log("Estimated Payment: " + estPayment);
                 Debug.Log("Interest: " + intMult);
-                
-                //Here is a set of calculations using compound interest instead of the above calcs
-                float APR = CalcInterest();
-                //50% annual rates are HUGE.  A more sensible range of rates might be 3-20%, for now let's use the existing code
-                //there are 4 periods per year, so the period percentage is:
-                float periodRate = 100*(Math.Pow((1+APR/100),(1.0/4))-1); //gives the rate in %
-                //the next calculation gives the payment value including the interest accrued over the life of the loan
-                float paymentValue = (1.0/(periodRate/100))*(1 - 1.0/(Math.Pow((1+periodRate/100),payments)));
-                
-                //the estimated payment is the loan principle (required amount) divided by the payment value
-                estPayment = reqAmount / paymentValue;
-                
-                //the total loan to be repayed is given by the estimated payment times the number of periods for the life of the loan
-                amountFinanced = estPayment*payments; 
-                Debug.Log("Compound Financed: " + amountFinanced);
-                Debug.Log("Estimated Payment: " + estPayment);
-                Debug.Log("Annual Interest Rate (APR): " + APR);
-                Debug.Log("paymentValue: " + paymentValue);
-                /*what should really be done is to keep track of the per period interest rate and the following steps
-                would look like a real loan:
-                At the loan disbursement, apply the value of the loan, only, as the financed amount.
-                Each update period the following would be calculated: interest amount based on the periodRate calculated above.
-                The interest rate is added to the financed amount for this period.
-                Then, the player would be asked if they authorize the standard payment for the period (i.e. the estPayment).
-                IF the player only payed the estPayment each period, the loan would eventually be payed back
-                (including the compound interest).  An option should probably be included for the player to provide a larger payment 
-                than the estPayment to pay down more of the loan principle.
-                A simple check making the max payment no larger than the remaining principle*(1+periodRate) would eliminate overpaying
-                the loan.
-                */
             }
             if (amountFinanced != 0)
             {
@@ -546,7 +514,7 @@ namespace Kerbanomics
             if (values != null)
             {
                 if (values.HasValue("OutstandingBills")) bills = (Double)Double.Parse(values.GetValue("OutstandingBills"));
-                if (values.HasValue("LoanAmount")) loanAmount = (Int32)Int32.Parse(values.GetValue("LoanAmount"));
+                if (values.HasValue("LoanAmount")) loanAmount = (Double)Double.Parse(values.GetValue("LoanAmount"));
                 if (values.HasValue("LoanPayment")) loanPayment = (Int32)Int32.Parse(values.GetValue("LoanPayment"));
             }
         }
