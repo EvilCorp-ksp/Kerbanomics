@@ -9,23 +9,29 @@ using KSP;
 namespace Kerbanomics
 {
     [KSPAddon(KSPAddon.Startup.EveryScene, false)]
-    public class Kerbanomics : MonoBehaviour
+    public class KerbanomicsMain : MonoBehaviour
     {
         private String save_folder;
         private bool billing_enabled = true;
         private bool autopayEnabled = false;
         private int threshold = 50;
-        private double autopayAmount = 0;
         private int level0 = 10;
         private int level1 = 20;
         private int level2 = 40;
         private int level3 = 80;
         private int level4 = 140;
-        private int level5 = 200;
+        public int level5 = 200;
         private float standbyPct = 50;
         private bool yearly = false;
-        
-        private double bills = 0;
+        private bool customInterval = false;
+        private bool quarterly = true;
+        private int intervalDays = 106;
+        string currentInterval = "Quarterly";
+        float baseFundsPerDay = 23.474178403755868544600938967136f;
+        float fPerDayMult = 2.3239436619718309859154929577465f;
+        private int intervalDaysBuffer = 106;
+
+        public double bills = 0;
         private double loanAmount = 0;
         private float loanPayment = 0;
         int addPay = 0;
@@ -33,6 +39,7 @@ namespace Kerbanomics
         float amountFinanced = 0;
         float estPayment = 0;
         int payments = 10;
+        double pmt = 0;
 
         private ConfigNode settings;
         private ConfigNode values;
@@ -42,10 +49,11 @@ namespace Kerbanomics
         private Rect settingsWindow = new Rect(Screen.height / 8 + 500, Screen.width / 4 , 300, 400);
         private Rect mainWindow = new Rect(Screen.width / 8 + 100, Screen.height / 4, 400, 125); 
         private Rect loanWindow = new Rect(Screen.width / 8 + 500, Screen.height / 4 , 400, 125);
+        private Rect payBills = new Rect(Screen.width / 8 + 50, Screen.height / 4, 400, 125);
         public ApplicationLauncherButton button;
-        public static Kerbanomics Instance;
+        public static KerbanomicsMain Instance;
 
-        public void Awake()
+        void Awake()
         {
             LoadSettings();
         }
@@ -59,10 +67,10 @@ namespace Kerbanomics
             Instance = this;
             GameEvents.onGUIApplicationLauncherReady.Add(OnGUIAppLauncherReady);
             save_folder = GetRootPath() + "/saves/" + HighLogic.SaveFolder + "/";
-            LoadSettings();
+            //LoadSettings();
             SetInterval();
             UpdateLastUpdate();
-            LoadData();
+            //LoadData();
         }
 
         public void DestroyButtons()
@@ -73,16 +81,13 @@ namespace Kerbanomics
 
         void Update()
         {
-            
             if (HighLogic.LoadedSceneHasPlanetarium)
             {
+                SetInterval();
                 int currentPeriod = (int)Math.Floor(Planetarium.GetUniversalTime() / _interval);
                 if (currentPeriod > _lastUpdate && billing_enabled == true)
                 {
-                    GetInterval();
-                    float multiplier = 106.5f;
-                    if (yearly == true)
-                        multiplier = 426.08f;
+                    float multiplier = intervalDays;
                     Debug.Log("Last Update=" + _lastUpdate + ", Current Period=" + currentPeriod);
                     _lastUpdate = (currentPeriod);
                     StringBuilder message = new StringBuilder();
@@ -90,29 +95,33 @@ namespace Kerbanomics
                     message.AppendLine("Current staff:");
                     foreach (ProtoCrewMember crewMember in HighLogic.CurrentGame.CrewRoster.Crew)
                     {
-                        //string crewMemberInfo = crewMember.name + " " + crewMember.rosterStatus.ToString() + crewMember.experienceLevel;
                         message.Append(crewMember.name);
                         if (!crewMember.rosterStatus.Equals(ProtoCrewMember.RosterStatus.Dead) && !crewMember.rosterStatus.Equals(ProtoCrewMember.RosterStatus.Missing))
                         {
-                            float paycheck = GetWages(crewMember.experienceLevel, crewMember.rosterStatus.ToString()) * multiplier;
-                            message.AppendLine(", level " + crewMember.experienceLevel + ", is " + crewMember.rosterStatus + ". Wages paid = " + paycheck);
-                            //Debug.Log(crewMemberInfo);
-                            //Debug.Log("Roster Status: " + crewMember.rosterStatus.ToString());
+                            float paycheck = (int)Math.Round(GetWages(crewMember.experienceLevel, crewMember.rosterStatus.ToString()) * multiplier);
+                            message.AppendLine(" is " + crewMember.rosterStatus + ". Paycheck = " + paycheck);
                             Debug.Log("Multiplier: " + multiplier);
                             Debug.Log("Wages: " + GetWages(crewMember.experienceLevel, crewMember.rosterStatus.ToString()));
-                            Funding.Instance.AddFunds(-paycheck, 0);
+                            bills = (int)Math.Round(bills + paycheck);
                         }
                     }
-                    Funding.Instance.AddFunds(-PayLoan(loanPayment), 0);
-                    message.AppendLine("Thank you for your loan payment in the amount of " + loanPayment + "! Have a pleasant day!");
-                    float externalFunding = 2500 + (247.5f * Reputation.CurrentRep);
-                    if (yearly == true)
-                        externalFunding = 10000 + (990 * Reputation.CurrentRep);
+                    if (loanAmount > 0)
+                    {
+                        //Funding.Instance.AddFunds(-PayLoan(loanPayment), 0);
+                        message.AppendLine("Your loan payment in the amount of " + loanPayment + " is due, please make your payment.");
+                    }
+                    float externalFunding = CalcFunding();
                     Funding.Instance.AddFunds(+externalFunding, 0);
+                    Debug.Log(externalFunding);
                     message.AppendLine("Received Funding - " + externalFunding);
-                    SaveData();
+                    message.AppendLine("Amount Due: " + bills.ToString());
+                    //SaveData();
+                    if (autopayEnabled == true)
+                    {
+                        message.AppendLine("Autopay enabled, paid out " + AutoPay(bills, Funding.Instance.Funds, threshold).ToString());
+                    }
                     MessageSystem.Message m = new MessageSystem.Message(
-                        "Processing Finances",
+                        "New Bill Ready",
                         message.ToString(),
                         MessageSystemButton.MessageButtonColor.RED,
                         MessageSystemButton.ButtonIcons.ALERT);
@@ -120,17 +129,62 @@ namespace Kerbanomics
                 }
             }
         }
-        
+
+        private double AutoPay(double due, double available, float pct)
+        {
+            double payment = 0;
+            float mult = pct / 100;
+            if (due > ((Double)Math.Ceiling(available * mult)))
+            {
+                payment = available * mult;
+            }
+            else if (due <= ((Double)Math.Ceiling(available * mult)))
+            {
+                payment = due;
+            }
+            Funding.Instance.AddFunds(-(int)Math.Round(payment), 0);
+            bills = bills - (int)Math.Round(payment);
+            Debug.Log("Payment: " + payment);
+            Debug.Log("AP Pct: " + pct);
+            Debug.Log("AP Mult: " + mult);
+            return payment;
+        }
+
+        private float CalcFunding()
+        {
+            float f = 0;
+            if (quarterly == true)
+            {
+                f = 2500 + (247.5f * Reputation.CurrentRep);
+            }
+            if (yearly == true)
+            {
+                f = 10000 + (990 * Reputation.CurrentRep);
+            }
+            if (customInterval == true)
+            {
+                f = (int)Math.Ceiling((baseFundsPerDay + (fPerDayMult * Reputation.CurrentRep)));
+            }
+            return f;
+        }
+
         private void SetInterval()
         {
-            if (GameSettings.KERBIN_TIME && yearly == false)
-                _interval = 2300400;
-            else if (!GameSettings.KERBIN_TIME && yearly == false)
-                _interval = 7884000;
-            else if (GameSettings.KERBIN_TIME && yearly == true)
-                _interval = 9201600;
-            else if (!GameSettings.KERBIN_TIME && yearly == true)
-                _interval = 31536000;
+            if (customInterval == false)
+            {
+                if (GameSettings.KERBIN_TIME && quarterly == true)
+                    _interval = 2300400;
+                else if (!GameSettings.KERBIN_TIME && quarterly == true)
+                    _interval = 7884000;
+                else if (GameSettings.KERBIN_TIME && yearly == true)
+                    _interval = 9201600;
+                else if (!GameSettings.KERBIN_TIME && yearly == true)
+                    _interval = 31536000;
+            }
+            else if (customInterval == true)
+            {
+                _interval = CalcInterval(intervalDays);
+            }
         }
 
         private double GetInterval()
@@ -138,6 +192,13 @@ namespace Kerbanomics
             double interval = _interval;
             return interval;
 
+        }
+
+        private double CalcInterval(int days)
+        {
+            double seconds = 0;
+            seconds = days * 21600;
+            return seconds;
         }
 
         private void UpdateLastUpdate()
@@ -206,7 +267,6 @@ namespace Kerbanomics
             Debug.Log("billing_enabled = " + billing_enabled);
             Debug.Log("autopayEnabled = " + autopayEnabled);
             Debug.Log("threshold = " + threshold);
-            Debug.Log("autopayAmount = " + autopayAmount);
             Debug.Log("level0 = " + level0);
             Debug.Log("level1 = " + level1);
             Debug.Log("level2 = " + level2);
@@ -240,16 +300,34 @@ namespace Kerbanomics
             //}
         }
 
+        private double CalculateThreshold()
+        {
+            double maxPayment = 0;
+            float mult = threshold / 100;
+            maxPayment = Funding.Instance.Funds * threshold;
+            return maxPayment;
+        }
+
+        private void DrawInvoiceWindow()
+        {
+            payBills = GUILayout.Window(81365, payBills, InvoiceWindow, "Pending Bills");
+        }
+
         private void OnWindow(int windowId)
         {
             GUILayout.BeginHorizontal();
             GUILayout.Label("Outstanding Bills: " + bills.ToString());
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button("Pay Bills"))
+            {
+                RenderingManager.AddToPostDrawQueue(0, DrawInvoiceWindow);
+            }
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
             GUILayout.Label("Loan Balance: " + Double.Parse(loanAmount.ToString()));
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
-            GUILayout.Label("Scheduled Loan Payment: " + loanPayment.ToString());
+            GUILayout.Label("Next Loan Payment: " + loanPayment.ToString());
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Loans", GUILayout.ExpandWidth(true)))
@@ -264,18 +342,86 @@ namespace Kerbanomics
             GUI.DragWindow();
         }
 
+        private void CycleInterval()
+        {
+            if (customInterval == true)
+            {
+                yearly = false;
+                quarterly = true;
+                customInterval = false;
+                currentInterval = "Quarterly";
+                Debug.Log("Changed from Custom to Quarterly");
+            }
+            else if (yearly == true)
+            {
+                yearly = false;
+                customInterval = true;
+                quarterly = false;
+                currentInterval = "Custom";
+                Debug.Log("Changed from Yearly to Custom");
+            }
+            else if (quarterly == true)
+            {
+                customInterval = false;
+                quarterly = false;
+                yearly = true;
+                currentInterval = "Yearly";
+                Debug.Log("Changed from Quarterly to Yearly");
+            }
+            SetInterval();
+        }
+
         private void SettingsWind(int windowId)
         {
             GUILayout.BeginHorizontal();
             billing_enabled = GUILayout.Toggle(billing_enabled, "Enabled");
-            GUILayout.FlexibleSpace();
-            yearly = GUILayout.Toggle(yearly, "Yearly Billing");
             GUILayout.EndHorizontal();
-            //GUILayout.BeginHorizontal();
-            //GUILayout.Label("Maximum % of funds paid per period: ");
-            //GUILayout.FlexibleSpace();
-            //threshold = Convert.ToInt32(GUILayout.TextField(threshold.ToString(), 3, GUILayout.Width(50)));
-            //GUILayout.EndHorizontal();
+            if (billing_enabled == true)
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Label("Interval: ");
+                if (customInterval == true)
+                {
+                    if (GUILayout.Button(currentInterval, GUILayout.Width(75)))
+                    {
+                        CycleInterval();
+                    }
+                    GUILayout.FlexibleSpace();
+                    intervalDaysBuffer = Convert.ToInt32(GUILayout.TextField(intervalDaysBuffer.ToString(), 4, GUILayout.Width(50)));
+                    GUILayout.Label(" days");
+                }
+                if (yearly == true)
+                {
+                    if (GUILayout.Button(currentInterval, GUILayout.Width(75)))
+                    {
+                        CycleInterval();
+                    }
+                }
+                if (quarterly == true)
+                {
+                    if (GUILayout.Button(currentInterval, GUILayout.Width(75)))
+                    {
+                        CycleInterval();
+                    }
+                }
+                //if (billing_enabled == false)
+                //{
+                //    if (GUILayout.Button(currentInterval, GUILayout.Width(75)))
+                //    {
+                //        CycleInterval();
+                //    }
+                //}
+                //yearly = GUILayout.Toggle(yearly, "Yearly Billing");
+                GUILayout.FlexibleSpace();
+                GUILayout.EndHorizontal();
+            }
+            GUILayout.BeginHorizontal();
+            autopayEnabled = GUILayout.Toggle(autopayEnabled, "Enable Autopay");
+            GUILayout.FlexibleSpace();
+            GUILayout.Label("Maximum % of funds to autopay: ");
+            GUILayout.FlexibleSpace();
+            threshold = Convert.ToInt32(GUILayout.TextField(threshold.ToString(), 3, GUILayout.Width(50)));
+            GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
             GUILayout.Label("Level 0 Daily Wages: ");
             GUILayout.FlexibleSpace();
@@ -317,6 +463,7 @@ namespace Kerbanomics
                 SaveSettings();
                 SetInterval();
                 UpdateLastUpdate();
+                intervalDays = intervalDaysBuffer;
             }
             if (GUILayout.Button("Reset to Default", GUILayout.ExpandWidth(true)))
             {
@@ -328,6 +475,7 @@ namespace Kerbanomics
             if (GUILayout.Button("Close", GUILayout.ExpandWidth(true)))
             {
                 RenderingManager.RemoveFromPostDrawQueue(0, DrawSettings);
+                SetInterval();
             }
             GUILayout.EndHorizontal();
             GUI.DragWindow();
@@ -375,14 +523,12 @@ namespace Kerbanomics
                     Funding.Instance.AddFunds(reqAmount, 0);
                     loanAmount = loanAmount + amountFinanced;
                     loanPayment = loanPayment + (amountFinanced / payments);
-                    SaveData();
                     RenderingManager.RemoveFromPostDrawQueue(0, DrawLoanWindow);
                 }
             }
             if (GUILayout.Button("Close"))
             {
                 RenderingManager.RemoveFromPostDrawQueue(0, DrawLoanWindow);
-                SaveData();
             }
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
@@ -403,7 +549,6 @@ namespace Kerbanomics
                 {
                     Funding.Instance.AddFunds(-addPay, 0);
                     PayLoan(addPay);
-                    SaveData();
                     RenderingManager.RemoveFromPostDrawQueue(0, DrawLoanWindow);
                 }
                 GUILayout.EndHorizontal();
@@ -411,34 +556,35 @@ namespace Kerbanomics
             GUI.DragWindow();
         }
 
-        private void LoanWindLayoutDeny(int windowId)
+        private void InvoiceWindow(int windowId)
         {
-                GUILayout.BeginHorizontal();
-                GUILayout.FlexibleSpace();
-                GUILayout.Label("You've already borrowed money, you have to pay off your original loan before borrowing more!");
-                GUILayout.FlexibleSpace();
-                GUILayout.EndHorizontal();
-                GUILayout.BeginHorizontal();
-                GUILayout.FlexibleSpace();
-                GUILayout.Label("Additional Loan Payment: ");
-                addPay = Convert.ToInt32(GUILayout.TextField(loanPayment.ToString(), 7));
-                GUILayout.FlexibleSpace();
-                GUILayout.EndHorizontal();
-                GUILayout.BeginHorizontal();
-                if(GUILayout.Button("Pay", GUILayout.ExpandWidth(true)))
-                {
-                    Funding.Instance.AddFunds(-addPay, 0);
-                    PayLoan(addPay);
-                    addPay = 0;
-                    SaveData();
-                    RenderingManager.RemoveFromPostDrawQueue(0, DrawLoanWindow);
-                }
-                if(GUILayout.Button("Close", GUILayout.ExpandWidth(true)))
-                {
-                    RenderingManager.RemoveFromPostDrawQueue(0, DrawLoanWindow);
-                }
-                GUILayout.EndHorizontal();
-                GUI.DragWindow();
+            
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Amount Due: " + bills);
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Payment: ");
+            GUILayout.FlexibleSpace();
+            pmt = Convert.ToDouble(GUILayout.TextField(pmt.ToString(), 7, GUILayout.Width(75)));
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button("Pay", GUILayout.Width(75)))
+            {
+                Funding.Instance.AddFunds(-pmt, 0);
+                bills = bills - pmt;
+                //SaveData();
+                RenderingManager.RemoveFromPostDrawQueue(0, DrawInvoiceWindow);
+            }
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button("Close", GUILayout.Width(75)))
+            {
+                RenderingManager.RemoveFromPostDrawQueue(0, DrawInvoiceWindow);
+            }
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+            GUI.DragWindow();
         }
 
         void onAppLauncherToggleOff()
@@ -455,7 +601,7 @@ namespace Kerbanomics
             return path;
         }
 
-        private void SaveSettings()
+        public void SaveSettings()
         {
             settings = new ConfigNode();
             settings.name = "SETTINGS";
@@ -463,7 +609,6 @@ namespace Kerbanomics
             settings.AddValue("Yearly", yearly);
             settings.AddValue("Threshold", threshold);
             settings.AddValue("Autopay", autopayEnabled);
-            settings.AddValue("AutopayAmount", autopayAmount);
             settings.AddValue("WagesLevel0", level0);
             settings.AddValue("WagesLevel1", level1);
             settings.AddValue("WagesLevel2", level2);
@@ -475,7 +620,7 @@ namespace Kerbanomics
             settings.Save(save_folder + "Settings.cfg");
         }
 
-        private void LoadSettings()
+        public void LoadSettings()
         {
             settings = new ConfigNode();
             settings = ConfigNode.Load(save_folder + "Settings.cfg");
@@ -485,7 +630,6 @@ namespace Kerbanomics
                 if (settings.HasValue("Yearly")) yearly = Boolean.Parse(settings.GetValue("Yearly"));
                 if (settings.HasValue("Threshold")) threshold = (Int32)Int32.Parse(settings.GetValue("Threshold"));
                 if (settings.HasValue("Autopay")) autopayEnabled = Boolean.Parse(settings.GetValue("Autopay"));
-                if (settings.HasValue("AutopayAmount")) autopayAmount = (Double)Double.Parse(settings.GetValue("AutopayAmount"));
                 if (settings.HasValue("WagesLevel0")) level0 = (Int32)Int32.Parse(settings.GetValue("WagesLevel0"));
                 if (settings.HasValue("WagesLevel1")) level1 = (Int32)Int32.Parse(settings.GetValue("WagesLevel1"));
                 if (settings.HasValue("WagesLevel2")) level2 = (Int32)Int32.Parse(settings.GetValue("WagesLevel2"));
@@ -496,7 +640,7 @@ namespace Kerbanomics
             }
         }
 
-        private void SaveData()
+        public void SaveData()
         {
             values = new ConfigNode();
             values.name = "VALUES";
@@ -507,7 +651,7 @@ namespace Kerbanomics
             values.Save(save_folder + "Financials");
         }
 
-        private void LoadData()
+        public void LoadData()
         {
             values = new ConfigNode();
             values = ConfigNode.Load(save_folder + "Financials");
@@ -524,7 +668,6 @@ namespace Kerbanomics
             billing_enabled = true;
             autopayEnabled = false;
             threshold = 50;
-            autopayAmount = 0;
             level0 = 10;
             level1 = 20;
             level2 = 40;
@@ -533,6 +676,9 @@ namespace Kerbanomics
             level5 = 200;
             standbyPct = 50;
             yearly = false;
+            quarterly = true;
+            customInterval = false;
+            intervalDays = 106;
         }
         
         private float PayLoan(float payment)
