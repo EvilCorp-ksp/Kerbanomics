@@ -607,6 +607,7 @@ namespace Kerbanomics
             settings.name = "SETTINGS";
             settings.AddValue("Enabled", billing_enabled);
             settings.AddValue("Yearly", yearly);
+            settings.AddValue("Quarterly", quarterly);
             settings.AddValue("Threshold", threshold);
             settings.AddValue("Autopay", autopayEnabled);
             settings.AddValue("WagesLevel0", level0);
@@ -616,6 +617,8 @@ namespace Kerbanomics
             settings.AddValue("WagesLevel4", level4);
             settings.AddValue("WagesLevel5", level5);
             settings.AddValue("StandbyPercentage", standbyPct);
+            settings.AddValue("CustomInterval", customInterval);
+            settings.AddValue("IntervalDays", intervalDays);
 
             settings.Save(save_folder + "Settings.cfg");
         }
@@ -628,6 +631,7 @@ namespace Kerbanomics
             {
                 if (settings.HasValue("Enabled")) billing_enabled = Boolean.Parse(settings.GetValue("Enabled"));
                 if (settings.HasValue("Yearly")) yearly = Boolean.Parse(settings.GetValue("Yearly"));
+                if (settings.HasValue("Quarterly")) quarterly = Boolean.Parse(settings.GetValue("Quarterly"));
                 if (settings.HasValue("Threshold")) threshold = (Int32)Int32.Parse(settings.GetValue("Threshold"));
                 if (settings.HasValue("Autopay")) autopayEnabled = Boolean.Parse(settings.GetValue("Autopay"));
                 if (settings.HasValue("WagesLevel0")) level0 = (Int32)Int32.Parse(settings.GetValue("WagesLevel0"));
@@ -637,6 +641,8 @@ namespace Kerbanomics
                 if (settings.HasValue("WagesLevel4")) level4 = (Int32)Int32.Parse(settings.GetValue("WagesLevel4"));
                 if (settings.HasValue("WagesLevel5")) level5 = (Int32)Int32.Parse(settings.GetValue("WagesLevel5"));
                 if (settings.HasValue("StandbyPercentage")) standbyPct = (Int32)Int32.Parse(settings.GetValue("StandbyPercentage"));
+                if (settings.HasValue("CustomInterval")) customInterval = Boolean.Parse(settings.GetValue("CustomInterval"));
+                if (settings.HasValue("IntervalDays")) intervalDays = (Int32)Int32.Parse(settings.GetValue("IntervalDays"));
             }
         }
 
