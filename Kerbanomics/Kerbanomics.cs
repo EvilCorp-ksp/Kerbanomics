@@ -561,6 +561,7 @@ namespace Kerbanomics
                 //50% annual rates are HUGE.  A more sensible range of rates might be 3-20%, for now let's use the existing code
                 //After running this calc a few times, 50% is not too bad on a small number of payments
 
+                /*
                 //there are 4 periods per year, so the period percentage is:
                 if (yearly == false)
                 {
@@ -575,7 +576,22 @@ namespace Kerbanomics
                     //there are probably better ways to prorate this, but the logic would be difficult to shoe-horn into the existing
                     //framework as is...
                 }
+                */
 
+                //custom intervals means we need a new number of periods per annum calculation.
+                int yearInterval = 0;
+                if (GameSettings.KERBIN_TIME)
+                {
+                    yearInterval = 9201600;
+                }
+                else
+                {
+                    yearInterval = 31536000;
+                }
+
+                double numPeriods = yearInterval / GetInterval();
+                periodRate = (float)(100 * (Math.Pow((1 + APR / 100), (1.0 / numPeriods)) - 1)); //gives the rate in %
+                
                 //the next calculation gives the payment value including the interest accrued over the life of the loan
                 float paymentValue = (float)((1.0 / (periodRate / 100)) * (1 - 1.0 / (Math.Pow((1 + periodRate / 100), payments))));
 
@@ -588,6 +604,7 @@ namespace Kerbanomics
                 amountFinanced = reqAmount;
                 //principle = reqAmount; //not sure if I"ll use this variable yet...
 
+                Debug.Log("Number of Periods per annum: " + numPeriods);
                 Debug.Log("Annual Percentage Rate (APR): " + APR);
                 Debug.Log("Period Rate: " + periodRate);
                 Debug.Log("paymentValue: " + paymentValue);
@@ -622,7 +639,9 @@ namespace Kerbanomics
                     //Debug.Log("2x Loan Ammount: " + loanAmount);
                     //Debug.Log("2x Estimated Payment: " + loanPayment);
 
+                    SaveData();
                     RenderingManager.RemoveFromPostDrawQueue(0, DrawLoanWindow);
+                    //there used to be a "saveData()" function call in here I think...
                 }
             }
             if (GUILayout.Button("Close"))
