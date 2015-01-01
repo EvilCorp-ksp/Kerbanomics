@@ -31,6 +31,10 @@ namespace Kerbanomics
         float fPerDayMult = 2.3239436619718309859154929577465f;
         private int intervalDaysBuffer = 106;
 
+        float BASE_REP_FUNDING_YEARLY = 990.0f;
+        float DEATH_REP_PENALTY_YEARLY = 2000.0f; //per kerbal.  Kill 5 kerbals, get 0 funding IF your rep=0
+        float BASE_FUNDING_YEARLY = 10000.0f;
+
         public double bills = 0;
         private double loanAmount = 0;
         private float loanPayment = 0;
@@ -77,7 +81,7 @@ namespace Kerbanomics
             //LoadSettings();
             SetInterval();
             UpdateLastUpdate();
-            //LoadData();
+            LoadData();
         }
 
         public void DestroyButtons()
@@ -123,7 +127,7 @@ namespace Kerbanomics
                     }
 
                     //here are some debug checks for the new "updateLoan" function
-                    //Debug.Log("Starting loan balance: " + loanAmount);
+                    Debug.Log("Starting loan balance: " + loanAmount);
                     
                     float periodInt = updateLoan(periodRate); //this adds the interest to the loan principle
                     
@@ -140,6 +144,10 @@ namespace Kerbanomics
                     {
                         message.AppendLine("Autopay enabled, paid out " + AutoPay(bills, Funding.Instance.Funds, threshold).ToString());
                     }
+
+                    SaveData(); //keep current loan data
+
+
                     MessageSystem.Message m = new MessageSystem.Message(
                         "New Bill Ready",
                         message.ToString(),
@@ -173,18 +181,59 @@ namespace Kerbanomics
         private float CalcFunding()
         {
             float f = 0;
+            
+            //the following code eliminates all the if statements for different interval rates and handles all of them equally well
+
+            int yearInterval = 0;
+            if (GameSettings.KERBIN_TIME)
+            {
+                yearInterval = 9201600;
+            }
+            else
+            {
+                yearInterval = 31536000;
+            }
+
+            float numPeriods = (float)(yearInterval / GetInterval());
+
+            //adding the Math.Max(exp, 0) eliminates negative "payments", but doesn't eliminate the per Kerbal death penalty (see below)
+            f = Math.Max((int)Math.Ceiling((BASE_FUNDING_YEARLY/numPeriods + (BASE_REP_FUNDING_YEARLY/numPeriods * Reputation.CurrentRep))),0);
+
+
+            /*
             if (quarterly == true)
             {
-                f = 2500 + (247.5f * Reputation.CurrentRep);
+                f = BASE_FUNDING_YEARLY/4.0 + ((BASE_REP_FUNDING_YEARLY /4.0) * Reputation.CurrentRep);
+
             }
             if (yearly == true)
             {
-                f = 10000 + (990 * Reputation.CurrentRep);
+                //f = 10000 + (990 * Reputation.CurrentRep);
+                f = 10000 + (BASE_FUNDING_YEARLY * Reputation.CurrentRep);
             }
             if (customInterval == true)
             {
+            
                 f = (int)Math.Ceiling((baseFundsPerDay + (fPerDayMult * Reputation.CurrentRep)));
             }
+            */
+
+            // I suggest a penalty for dead kerbals here
+            int deadKerbals = 0;
+
+            foreach (ProtoCrewMember crewMember in HighLogic.CurrentGame.CrewRoster.Crew)
+            {
+                if (crewMember.rosterStatus.Equals(ProtoCrewMember.RosterStatus.Dead) || crewMember.rosterStatus.Equals(ProtoCrewMember.RosterStatus.Missing))
+                {
+                    deadKerbals += 1;
+                }
+
+            }
+            Debug.Log("Dead kerbals counted: " + deadKerbals);
+            Debug.Log("Dead kerbal funding penalty: " + (deadKerbals * DEATH_REP_PENALTY_YEARLY / numPeriods));
+            
+            f -= deadKerbals * DEATH_REP_PENALTY_YEARLY/numPeriods;
+
             return f;
         }
 
@@ -669,6 +718,7 @@ namespace Kerbanomics
                     Funding.Instance.AddFunds(-PayLoan(addPay), 0);
                     //PayLoan(addPay);
                     RenderingManager.RemoveFromPostDrawQueue(0, DrawLoanWindow);
+                    SaveData();
                 }
                 GUILayout.EndHorizontal();
             }
@@ -693,7 +743,7 @@ namespace Kerbanomics
             {
                 Funding.Instance.AddFunds(-pmt, 0);
                 bills = bills - pmt;
-                //SaveData();
+                SaveData();
                 RenderingManager.RemoveFromPostDrawQueue(0, DrawInvoiceWindow);
             }
             GUILayout.FlexibleSpace();
