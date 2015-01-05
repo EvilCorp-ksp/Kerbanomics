@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
+using System.IO;
 using UnityEngine;
 using KSP;
 
@@ -30,10 +31,11 @@ namespace Kerbanomics
         float baseFundsPerDay = 23.474178403755868544600938967136f;
         float fPerDayMult = 2.3239436619718309859154929577465f;
         private int intervalDaysBuffer = 106;
+        private bool KACEnabled = false;
 
         public double bills = 0;
         private double loanAmount = 0;
-        private float loanPayment = 0;
+        private double loanPayment = 0;
         int addPay = 0;
         int reqAmount = 0;
         float amountFinanced = 0;
@@ -71,6 +73,12 @@ namespace Kerbanomics
             SetInterval();
             UpdateLastUpdate();
             //LoadData();
+            Kerbanomics_KACWrapper.KACWrapper.InitKACWrapper();
+            if (Kerbanomics_KACWrapper.KACWrapper.APIReady)
+            {
+                //All good to go
+                Debug.Log(Kerbanomics_KACWrapper.KACWrapper.KAC.Alarms.Count);
+            }
         }
 
         public void DestroyButtons()
@@ -126,6 +134,10 @@ namespace Kerbanomics
                         MessageSystemButton.MessageButtonColor.RED,
                         MessageSystemButton.ButtonIcons.ALERT);
                     MessageSystem.Instance.AddMessage(m);
+                    if (Kerbanomics_KACWrapper.KACWrapper.AssemblyExists == true)
+                    {
+                        SetKACAlarm();
+                    }
                 }
             }
         }
@@ -665,7 +677,7 @@ namespace Kerbanomics
             {
                 if (values.HasValue("OutstandingBills")) bills = (Double)Double.Parse(values.GetValue("OutstandingBills"));
                 if (values.HasValue("LoanAmount")) loanAmount = (Double)Double.Parse(values.GetValue("LoanAmount"));
-                if (values.HasValue("LoanPayment")) loanPayment = (Int32)Int32.Parse(values.GetValue("LoanPayment"));
+                if (values.HasValue("LoanPayment")) loanPayment = (Double)Double.Parse(values.GetValue("LoanPayment"));
             }
         }
 
@@ -685,6 +697,7 @@ namespace Kerbanomics
             quarterly = true;
             customInterval = false;
             intervalDays = 106;
+            KACEnabled = false;
         }
         
         private float PayLoan(float payment)
@@ -733,6 +746,11 @@ namespace Kerbanomics
             interest = interest / 100;
             float total = amount * interest / 10;
             return total;
+        }
+
+        private void SetKACAlarm()
+        {
+            Kerbanomics_KACWrapper.KACWrapper.KAC.CreateAlarm(Kerbanomics_KACWrapper.KACWrapper.KACAPI.AlarmTypeEnum.Raw, "Next Bill Date", Planetarium.GetUniversalTime() + _interval);
         }
     }
 }
