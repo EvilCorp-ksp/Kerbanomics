@@ -49,9 +49,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="KACWrapper.cs" />
     <Compile Include="Kerbanomics.cs" />
-    <Compile Include="KerbanomicsCollateral.cs" />
     <Compile Include="KerbanomicsScenario.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

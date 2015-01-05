@@ -12,6 +12,8 @@ namespace Kerbanomics
     [KSPScenario(ScenarioCreationOptions.AddToAllGames, new GameScenes[] { GameScenes.FLIGHT, GameScenes.SPACECENTER, })]
     class KerbanomicsScenario : ScenarioModule
     {
+        //public static KerbanomicsScenario Instance;
+
         public override void OnLoad(ConfigNode node)
         {
             base.OnLoad(node);
