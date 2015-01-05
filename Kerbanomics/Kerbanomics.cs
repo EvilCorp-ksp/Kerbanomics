@@ -81,7 +81,12 @@ namespace Kerbanomics
             //LoadSettings();
             SetInterval();
             UpdateLastUpdate();
-            LoadData();
+            //LoadData();
+            Kerbanomics_KACWrapper.KACWrapper.InitKACWrapper();
+            if (Kerbanomics_KACWrapper.KACWrapper.APIReady)
+            {
+                Debug.Log(Kerbanomics_KACWrapper.KACWrapper.KAC.Alarms.Count);
+            }
         }
 
         public void DestroyButtons()
@@ -154,6 +159,10 @@ namespace Kerbanomics
                         MessageSystemButton.MessageButtonColor.RED,
                         MessageSystemButton.ButtonIcons.ALERT);
                     MessageSystem.Instance.AddMessage(m);
+                    if (Kerbanomics_KACWrapper.KACWrapper.AssemblyExists == true)
+                    {
+                        SetKACAlarm();
+                    }
                 }
             }
         }
@@ -933,6 +942,11 @@ namespace Kerbanomics
             interest = interest / 100;
             float total = amount * interest / 10;
             return total;
+        }
+
+        private void SetKACAlarm()
+        { 
+             Kerbanomics_KACWrapper.KACWrapper.KAC.CreateAlarm(Kerbanomics_KACWrapper.KACWrapper.KACAPI.AlarmTypeEnum.Raw, "Next Bill Date", Planetarium.GetUniversalTime() + _interval);
         }
     }
 }
