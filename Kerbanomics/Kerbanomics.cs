@@ -538,10 +538,10 @@ namespace Kerbanomics
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Save", GUILayout.ExpandWidth(true)))
             {
+                intervalDays = intervalDaysBuffer;
                 SaveSettings();
                 SetInterval();
                 UpdateLastUpdate();
-                intervalDays = intervalDaysBuffer;
             }
             if (GUILayout.Button("Reset to Default", GUILayout.ExpandWidth(true)))
             {
@@ -697,7 +697,9 @@ namespace Kerbanomics
                     //Debug.Log("2x Loan Ammount: " + loanAmount);
                     //Debug.Log("2x Estimated Payment: " + loanPayment);
 
-                    SaveData();
+                    //SaveData();
+                    //commenting out SaveData() here as it will write the loan and financial information to a file outside the standard save operation.
+                    //This can cause a disparity between your actual funds and what you owe.
                     RenderingManager.RemoveFromPostDrawQueue(0, DrawLoanWindow);
                     //there used to be a "saveData()" function call in here I think...
                 }
