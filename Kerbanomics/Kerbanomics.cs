@@ -27,9 +27,17 @@ namespace Kerbanomics
         private bool quarterly = true;
         private int intervalDays = 106;
         string currentInterval = "Quarterly";
-        float baseFundsPerDay = 23.474178403755868544600938967136f;
-        float fPerDayMult = 2.3239436619718309859154929577465f;
-        private int intervalDaysBuffer = 106;
+        //float baseFundsPerDay = 23.474178403755868544600938967136f;
+        //float fPerDayMult = 2.3239436619718309859154929577465f;
+        //private int intervalDaysBuffer = 106;
+        bool degradeReputation = false;
+        float degradeRate = 1;
+        float degradeRateLoaned = 3;
+        int intervalDegrade = 21600;
+        int countIntervalDegrade = 0;
+        bool autoKAC = true;
+        
+
 
         float BASE_REP_FUNDING_YEARLY = 990.0f;
         float DEATH_REP_PENALTY_YEARLY = 2000.0f; //per kerbal.  Kill 5 kerbals, get 0 funding IF your rep=0
@@ -101,6 +109,21 @@ namespace Kerbanomics
             {
                 SetInterval();
                 int currentPeriod = (int)Math.Floor(Planetarium.GetUniversalTime() / _interval);
+                int currentDegrade = (int)Math.Floor(Planetarium.GetUniversalTime() / intervalDegrade);
+                if (currentDegrade > countIntervalDegrade && degradeReputation == true)
+                {
+                    float rep;
+                    if (loanAmount > 0)
+                    { 
+                        rep = degradeRateLoaned;
+                    }
+                    else
+                    {
+                        rep = degradeRate;
+                    }
+                    Reputation.Instance.AddReputation(-rep, TransactionReasons.None);
+                    countIntervalDegrade = currentDegrade;
+                }
                 if (currentPeriod > _lastUpdate && billing_enabled == true)
                 {
                     //seem to be losing information somewhere in here.  A reload of the financials file should do it?
@@ -417,6 +440,9 @@ namespace Kerbanomics
                 RenderingManager.AddToPostDrawQueue(0, DrawSettings);
             }
             GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(Reputation.Instance.reputation.ToString());
+            GUILayout.EndHorizontal();
             GUI.DragWindow();
         }
 
@@ -458,38 +484,16 @@ namespace Kerbanomics
             {
                 GUILayout.BeginHorizontal();
                 GUILayout.Label("Interval: ");
-                if (customInterval == true)
-                {
                     if (GUILayout.Button(currentInterval, GUILayout.Width(75)))
                     {
                         CycleInterval();
                     }
                     GUILayout.FlexibleSpace();
-                    intervalDaysBuffer = Convert.ToInt32(GUILayout.TextField(intervalDaysBuffer.ToString(), 4, GUILayout.Width(50)));
-                    GUILayout.Label(" days");
-                }
-                if (yearly == true)
-                {
-                    if (GUILayout.Button(currentInterval, GUILayout.Width(75)))
+                    if (customInterval == true)
                     {
-                        CycleInterval();
+                        intervalDays = Convert.ToInt32(GUILayout.TextField(intervalDays.ToString(), 4, GUILayout.Width(50)));
+                        GUILayout.Label(" days");
                     }
-                }
-                if (quarterly == true)
-                {
-                    if (GUILayout.Button(currentInterval, GUILayout.Width(75)))
-                    {
-                        CycleInterval();
-                    }
-                }
-                //if (billing_enabled == false)
-                //{
-                //    if (GUILayout.Button(currentInterval, GUILayout.Width(75)))
-                //    {
-                //        CycleInterval();
-                //    }
-                //}
-                //yearly = GUILayout.Toggle(yearly, "Yearly Billing");
                 GUILayout.FlexibleSpace();
                 GUILayout.EndHorizontal();
             }
@@ -536,9 +540,26 @@ namespace Kerbanomics
             standbyPct = Convert.ToInt32(GUILayout.TextField(standbyPct.ToString(), 4, GUILayout.Width(50)));
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
+            autoKAC = GUILayout.Toggle(autoKAC, "Set KAC Alarm Automatically");
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            degradeReputation = GUILayout.Toggle(degradeReputation, "Reputation Degradation");
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Degradation Rate per day (normal): ");
+            GUILayout.FlexibleSpace();
+            degradeRate = Convert.ToSingle(GUILayout.TextField(degradeRate.ToString(), 4, GUILayout.Width(50)));
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Degradation Rate per day (loan): ");
+            GUILayout.FlexibleSpace();
+            degradeRateLoaned = Convert.ToSingle(GUILayout.TextField(degradeRateLoaned.ToString(), 4, GUILayout.Width(50)));
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
             if (GUILayout.Button("Save", GUILayout.ExpandWidth(true)))
             {
-                intervalDays = intervalDaysBuffer;
                 SaveSettings();
                 SetInterval();
                 UpdateLastUpdate();
@@ -800,6 +821,10 @@ namespace Kerbanomics
             settings.AddValue("StandbyPercentage", standbyPct);
             settings.AddValue("CustomInterval", customInterval);
             settings.AddValue("IntervalDays", intervalDays);
+            settings.AddValue("RepDegradeEnabled", degradeReputation);
+            settings.AddValue("NormalDegradeRate", degradeRate);
+            settings.AddValue("LoanedDegradeRate", degradeRateLoaned);
+            settings.AddValue("DegradationIntervalSeconds", intervalDegrade);
 
             settings.Save(save_folder + "Settings.cfg");
         }
@@ -824,6 +849,23 @@ namespace Kerbanomics
                 if (settings.HasValue("StandbyPercentage")) standbyPct = (Int32)Int32.Parse(settings.GetValue("StandbyPercentage"));
                 if (settings.HasValue("CustomInterval")) customInterval = Boolean.Parse(settings.GetValue("CustomInterval"));
                 if (settings.HasValue("IntervalDays")) intervalDays = (Int32)Int32.Parse(settings.GetValue("IntervalDays"));
+                if (settings.HasValue("RepDegradeEnabled")) degradeReputation = Boolean.Parse(settings.GetValue("RepDegradeEnabled"));
+                if (settings.HasValue("NormalDegradeRate")) degradeRate = (Single)Single.Parse(settings.GetValue("NormalDegradeRate"));
+                if (settings.HasValue("LoanedDegradeRate")) degradeRateLoaned = (Single)Single.Parse(settings.GetValue("LoanedDegradeRate"));
+                if (settings.HasValue("DegradationIntervalSeconds")) intervalDegrade = (Int32)Int32.Parse(settings.GetValue("DegradationIntervalSeconds"));
+
+                if (customInterval == true)
+                {
+                    currentInterval = "Custom";
+                }
+                if (yearly == true)
+                {
+                    currentInterval = "Yearly";
+                }
+                if (quarterly == true)
+                {
+                    currentInterval = "Quarterly";
+                }
             }
         }
 
@@ -836,6 +878,7 @@ namespace Kerbanomics
             values.AddValue("LoanPayment", loanPayment);
             values.AddValue("periodRate", periodRate);
             values.AddValue("LastUpdate", _lastUpdate);
+            values.AddValue("DegradeCounter", countIntervalDegrade);
 
             values.Save(save_folder + "Financials");
         }
@@ -851,6 +894,7 @@ namespace Kerbanomics
                 if (values.HasValue("LoanPayment")) loanPayment = (float)float.Parse(values.GetValue("LoanPayment"));
                 if (values.HasValue("periodRate")) periodRate = (float)float.Parse(values.GetValue("periodRate"));
                 if (values.HasValue("LastUpdate")) _lastUpdate = (int)int.Parse(values.GetValue("LastUpdate"));
+                if (values.HasValue("DegradeCounter")) countIntervalDegrade = (int)int.Parse(values.GetValue("DegradeCounter"));
 
                 loanMaturity = loanPayment * payments;
             }
@@ -955,5 +999,6 @@ namespace Kerbanomics
         { 
              Kerbanomics_KACWrapper.KACWrapper.KAC.CreateAlarm(Kerbanomics_KACWrapper.KACWrapper.KACAPI.AlarmTypeEnum.Raw, "Next Bill Date", Planetarium.GetUniversalTime() + _interval);
         }
+
     }
 }
