@@ -56,7 +56,7 @@ namespace Kerbanomics
         private ConfigNode values;
 
         double _interval = 2300400;
-        public static int _lastUpdate = 0;
+        public int _lastUpdate = 0;
         private Rect settingsWindow = new Rect(Screen.height / 8 + 500, Screen.width / 4 , 300, 400);
         private Rect mainWindow = new Rect(Screen.width / 8 + 100, Screen.height / 4, 400, 125); 
         private Rect loanWindow = new Rect(Screen.width / 8 + 500, Screen.height / 4 , 400, 125);
@@ -104,7 +104,7 @@ namespace Kerbanomics
                 if (currentPeriod > _lastUpdate && billing_enabled == true)
                 {
                     //seem to be losing information somewhere in here.  A reload of the financials file should do it?
-                    LoadData();
+                    //LoadData();
                     /*
                     Debug.Log("update check Period Rate: " + periodRate);
                     Debug.Log("update check Loan Ammount: " + loanAmount);
@@ -114,7 +114,7 @@ namespace Kerbanomics
                     GetInterval();
                     float multiplier = intervalDays;
                     Debug.Log("Last Update=" + _lastUpdate + ", Current Period=" + currentPeriod);
-                    _lastUpdate = (currentPeriod);
+                    _lastUpdate = currentPeriod;
                     StringBuilder message = new StringBuilder();
                     message.AppendLine("Payroll is processed.");
                     message.AppendLine("Current staff:");
@@ -150,7 +150,7 @@ namespace Kerbanomics
                         message.AppendLine("Autopay enabled, paid out " + AutoPay(bills, Funding.Instance.Funds, threshold).ToString());
                     }
 
-                    SaveData(); //keep current loan data
+                    //SaveData(); //keep current loan data
 
 
                     MessageSystem.Message m = new MessageSystem.Message(
@@ -561,7 +561,7 @@ namespace Kerbanomics
 
         private void LoanWindLayoutApprove(int windowId)
         {
-            //LoadData(); //just to be sure we are current so that a second loan adds instead of replaces
+            LoadData(); //just to be sure we are current so that a second loan adds instead of replaces
 
             GUILayout.BeginHorizontal();
             GUILayout.Label("Existing Debt: " + (int)(loanAmount));
@@ -700,8 +700,9 @@ namespace Kerbanomics
                     //SaveData();
                     //commenting out SaveData() here as it will write the loan and financial information to a file outside the standard save operation.
                     //This can cause a disparity between your actual funds and what you owe.
+                    Debug.Log("Financed - Loan Amount: " + loanAmount);
                     RenderingManager.RemoveFromPostDrawQueue(0, DrawLoanWindow);
-                    //there used to be a "saveData()" function call in here I think...
+                    //there used to be a "saveData()" function call in here I think...                    
                 }
             }
             if (GUILayout.Button("Close"))
@@ -834,6 +835,7 @@ namespace Kerbanomics
             values.AddValue("LoanAmount", loanAmount);
             values.AddValue("LoanPayment", loanPayment);
             values.AddValue("periodRate", periodRate);
+            values.AddValue("LastUpdate", _lastUpdate);
 
             values.Save(save_folder + "Financials");
         }
@@ -848,6 +850,7 @@ namespace Kerbanomics
                 if (values.HasValue("LoanAmount")) loanAmount = (Double)Double.Parse(values.GetValue("LoanAmount"));
                 if (values.HasValue("LoanPayment")) loanPayment = (float)float.Parse(values.GetValue("LoanPayment"));
                 if (values.HasValue("periodRate")) periodRate = (float)float.Parse(values.GetValue("periodRate"));
+                if (values.HasValue("LastUpdate")) _lastUpdate = (int)int.Parse(values.GetValue("LastUpdate"));
 
                 loanMaturity = loanPayment * payments;
             }
@@ -907,8 +910,10 @@ namespace Kerbanomics
         private float updateLoan(float periodRate)
         {
             //simple function to calculate the interest for the current period given the existing loan balance
+            Debug.Log("About to Update Loan - Loan Amount: " + loanAmount);
             float loanInterest = (float)(periodRate / 100.0 * loanAmount);
             loanAmount += loanInterest;
+            Debug.Log("Loan Updated - Loan Amount: " + loanAmount);
             return loanInterest;
         }
 
