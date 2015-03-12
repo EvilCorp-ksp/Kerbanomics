@@ -31,8 +31,7 @@ namespace Kerbanomics
         //float fPerDayMult = 2.3239436619718309859154929577465f;
         //private int intervalDaysBuffer = 106;
         bool degradeReputation = false;
-        float degradeRate = 1;
-        float degradeRateLoaned = 3;
+        float degradeRate = 2;
         int intervalDegrade = 21600;
         int countIntervalDegrade = 0;
         bool autoKAC = true;
@@ -112,28 +111,12 @@ namespace Kerbanomics
                 int currentDegrade = (int)Math.Floor(Planetarium.GetUniversalTime() / intervalDegrade);
                 if (currentDegrade > countIntervalDegrade && degradeReputation == true)
                 {
-                    float rep;
-                    if (loanAmount > 0)
-                    { 
-                        rep = degradeRateLoaned;
-                    }
-                    else
-                    {
-                        rep = degradeRate;
-                    }
+                    float rep = degradeRate;
                     Reputation.Instance.AddReputation(-rep, TransactionReasons.None);
                     countIntervalDegrade = currentDegrade;
                 }
                 if (currentPeriod > _lastUpdate && billing_enabled == true)
                 {
-                    //seem to be losing information somewhere in here.  A reload of the financials file should do it?
-                    //LoadData();
-                    /*
-                    Debug.Log("update check Period Rate: " + periodRate);
-                    Debug.Log("update check Loan Ammount: " + loanAmount);
-                    Debug.Log("update check Estimated Payment: " + loanPayment);
-                    */
-
                     GetInterval();
                     float multiplier = intervalDays;
                     Debug.Log("Last Update=" + _lastUpdate + ", Current Period=" + currentPeriod);
@@ -172,10 +155,6 @@ namespace Kerbanomics
                     {
                         message.AppendLine("Autopay enabled, paid out " + AutoPay(bills, Funding.Instance.Funds, threshold).ToString());
                     }
-
-                    //SaveData(); //keep current loan data
-
-
                     MessageSystem.Message m = new MessageSystem.Message(
                         "New Bill Ready",
                         message.ToString(),
@@ -548,14 +527,9 @@ namespace Kerbanomics
             GUILayout.FlexibleSpace();
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
-            GUILayout.Label("Degradation Rate per day (normal): ");
+            GUILayout.Label("Degradation rate per day: ");
             GUILayout.FlexibleSpace();
             degradeRate = Convert.ToSingle(GUILayout.TextField(degradeRate.ToString(), 4, GUILayout.Width(50)));
-            GUILayout.EndHorizontal();
-            GUILayout.BeginHorizontal();
-            GUILayout.Label("Degradation Rate per day (loan): ");
-            GUILayout.FlexibleSpace();
-            degradeRateLoaned = Convert.ToSingle(GUILayout.TextField(degradeRateLoaned.ToString(), 4, GUILayout.Width(50)));
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Save", GUILayout.ExpandWidth(true)))
@@ -582,8 +556,6 @@ namespace Kerbanomics
 
         private void LoanWindLayoutApprove(int windowId)
         {
-            LoadData(); //just to be sure we are current so that a second loan adds instead of replaces
-
             GUILayout.BeginHorizontal();
             GUILayout.Label("Existing Debt: " + (int)(loanAmount));
             GUILayout.FlexibleSpace();
@@ -601,7 +573,6 @@ namespace Kerbanomics
             GUILayout.BeginHorizontal();
             GUILayout.Label("New loan principal: " + reqAmount);
             GUILayout.FlexibleSpace();
-            //updatedPrincipal = Convert.ToInt32(GUILayout.TextField(updatedPrincipal.ToString(), 7, GUILayout.Width(75)));
             GUILayout.EndHorizontal();
 
             GUILayout.BeginHorizontal();
@@ -823,7 +794,6 @@ namespace Kerbanomics
             settings.AddValue("IntervalDays", intervalDays);
             settings.AddValue("RepDegradeEnabled", degradeReputation);
             settings.AddValue("NormalDegradeRate", degradeRate);
-            settings.AddValue("LoanedDegradeRate", degradeRateLoaned);
             settings.AddValue("DegradationIntervalSeconds", intervalDegrade);
 
             settings.Save(save_folder + "Settings.cfg");
@@ -851,7 +821,6 @@ namespace Kerbanomics
                 if (settings.HasValue("IntervalDays")) intervalDays = (Int32)Int32.Parse(settings.GetValue("IntervalDays"));
                 if (settings.HasValue("RepDegradeEnabled")) degradeReputation = Boolean.Parse(settings.GetValue("RepDegradeEnabled"));
                 if (settings.HasValue("NormalDegradeRate")) degradeRate = (Single)Single.Parse(settings.GetValue("NormalDegradeRate"));
-                if (settings.HasValue("LoanedDegradeRate")) degradeRateLoaned = (Single)Single.Parse(settings.GetValue("LoanedDegradeRate"));
                 if (settings.HasValue("DegradationIntervalSeconds")) intervalDegrade = (Int32)Int32.Parse(settings.GetValue("DegradationIntervalSeconds"));
 
                 if (customInterval == true)
