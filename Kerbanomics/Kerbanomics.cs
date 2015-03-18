@@ -11,7 +11,7 @@ namespace Kerbanomics
     [KSPAddon(KSPAddon.Startup.EveryScene, false)]
     public class KerbanomicsMain : MonoBehaviour
     {
-        private String save_folder;
+        private string save_folder = "";
         private bool billing_enabled = true;
         private bool autopayEnabled = false;
         private int threshold = 50;
@@ -59,8 +59,8 @@ namespace Kerbanomics
         Int32 requestedAmt = 0; //these are kinda messy introductions, sorry...
         Double updatedPrincipal = 0;
 
-        private ConfigNode settings;
-        private ConfigNode values;
+        private ConfigNode settings = new ConfigNode();
+        private ConfigNode values = new ConfigNode();
 
         double _interval = 2300400;
         public int _lastUpdate = 0;
@@ -68,8 +68,8 @@ namespace Kerbanomics
         private Rect mainWindow = new Rect(Screen.width / 8 + 100, Screen.height / 4, 400, 125); 
         private Rect loanWindow = new Rect(Screen.width / 8 + 500, Screen.height / 4 , 400, 125);
         private Rect payBills = new Rect(Screen.width / 8 + 50, Screen.height / 4, 400, 125);
-        public ApplicationLauncherButton button;
-        public static KerbanomicsMain Instance;
+        public ApplicationLauncherButton button = new ApplicationLauncherButton();
+        public static KerbanomicsMain Instance = new KerbanomicsMain();
 
         void Awake()
         {
@@ -78,10 +78,10 @@ namespace Kerbanomics
 
         public void Start()
         {
-            if (Instance != null)
-            {
-                Destroy(Instance);
-            }
+            //if (Instance != null)
+            //{
+            //    Destroy(Instance);
+            //}
             Instance = this;
             GameEvents.onGUIApplicationLauncherReady.Add(OnGUIAppLauncherReady);
             save_folder = GetRootPath() + "/saves/" + HighLogic.SaveFolder + "/";
@@ -109,7 +109,7 @@ namespace Kerbanomics
                 SetInterval();
                 int currentPeriod = (int)Math.Floor(Planetarium.GetUniversalTime() / _interval);
                 int currentDegrade = (int)Math.Floor(Planetarium.GetUniversalTime() / intervalDegrade);
-                if (currentDegrade > countIntervalDegrade && degradeReputation == true)
+                if (currentDegrade > countIntervalDegrade && degradeReputation == true && loanAmount > 0)
                 {
                     float rep = degradeRate;
                     Reputation.Instance.AddReputation(-rep, TransactionReasons.None);
